@@ -1,0 +1,42 @@
+import funkin.modding.module.Module;
+import flixel.FlxG;
+import funkin.play.PlayState;
+import funkin.play.notes.Strumline;
+import funkin.Paths;
+
+/*
+ * hi im bobby and i just want to say
+ * THIS IS NOT MY SCRIPT !!
+ * betopia made this, she coded this module (its on the psych engine discord)
+ * if you wanna use this specifically credit HER, not me.
+ * i included this cuz its just too cool
+ */
+
+class StrumBGRePos extends Module
+{
+    function new() {
+        super('StrumBGRePos');
+    }
+
+    var applied:Bool = false;
+
+    override function onUpdate(ev) {
+        var game = PlayState.instance;
+        if (game == null) {
+            applied = false;
+        }
+        if (game != null && game.currentStage != null && !applied) {
+            for (i in [game.opponentStrumline, game.playerStrumline]) {
+                var bg = i.background;
+                // if you wanna do some shit like blend modes then you can do so here
+                i.remove(bg);
+
+                game.insert(0, bg);
+                bg.camera = game.camHUD;
+                bg.x = i.x - Strumline.BACKGROUND_PAD;
+            }
+            applied = true;
+        }
+        super.onUpdate(ev);
+    }
+}

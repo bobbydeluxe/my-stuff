@@ -1,0 +1,28 @@
+import funkin.modding.module.Module;
+
+/**
+ * this module provides a simple toggle for lock-on shit
+ * to add lock-on features or other BDPot-dependent functionality, mods should
+ * import modulehandler, call this module, and use its toggle state to conditionally enable their features.
+ * 
+ * none of the tweaks in this mod will be affected, this is just for lock-on shit
+ *
+ * Example usage in another mod:
+ * 
+ * import funkin.modding.module.ModuleHandler;
+ * 
+ * var bdpotToggle = ModuleHandler.getModule('bdpot-toggle');
+ * if (bdpotToggle.scriptCall('enableCheck') && bdpotToggle != null) {
+ *     // do some shit like results screen colorchanges for characters or some menu tweaks idk
+ * }
+ */
+
+class BDPotToggleModule extends Module {
+    public function new () {
+        super('bdpot-toggle');
+    }
+
+    public function enableCheck() {
+        return true;
+    }
+}

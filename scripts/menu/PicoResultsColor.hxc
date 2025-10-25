@@ -1,0 +1,55 @@
+// pico blue results screen to match his backing card
+
+import flixel.FlxG;
+import funkin.util.ReflectUtil;
+import funkin.modding.module.Module;
+import flixel.util.FlxGradient;
+import funkin.graphics.shaders.AdjustColorShader;
+import flixel.FlxSprite;
+import flixel.addons.display.FlxBackdrop;
+import funkin.play.ResultState;
+import funkin.modding.module.ModuleHandler;
+
+class PicoResultsColoring extends Module
+{
+    var character:String = "pico";
+    public function new()
+    {
+        super('pico-results-coloring', 1,
+            {
+            state: ResultState
+            });
+    }
+
+    override function onUpdate(event:UpdateScriptEvent) {
+        super.onUpdate(event);
+
+        if (FlxG.state.subState.playerCharacterId == character) {
+            for (i in 2...14) { // had to do some trial and error to get these numbers
+                var member = FlxG.state.subState.members[i];
+                var spriteDrop = Std.downcast(member, FlxBackdrop);
+                if (spriteDrop != null) {
+                    spriteDrop.colorTransform.color = 0xFF85A3FF;
+                }
+            }
+        }
+    }
+
+    override function onSubStateOpenEnd(event:SubStateScriptEvent)
+    {
+        super.onSubStateOpenEnd(event);
+
+        if (FlxG.state.subState.playerCharacterId == character) {
+            for (i in 0...2) { // had to do some trial and error to get these numbers
+                var member = FlxG.state.subState.members[i];
+                var sprite = Std.downcast(member, FlxSprite);
+                if (sprite != null) {
+                    if (i == 0)
+                        sprite.pixels = FlxGradient.createGradientFlxSprite(FlxG.width, FlxG.height, [0xff7488fd, 0xff5c74fe], 90).pixels;
+                    else if (i == 1)
+                        sprite.pixels = FlxGradient.createGradientFlxSprite(FlxG.width, FlxG.height, [0xffa6b4ff, 0xffbeccff], 90).pixels;
+                }
+            }
+        }
+    }
+}

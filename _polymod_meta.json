@@ -1,0 +1,21 @@
+{
+  "title": "Bobby's Dumbass Pack of Tweaks",
+  "description": "just a mod that changes some shit a little",
+  "contributors": [
+    {
+      "name": "BobbyDX",
+      "role": "coded mostly everything"
+    },
+    {
+      "name": "Betopia",
+      "role": "coded the strumline bg repositioning module"
+    },
+    {
+      "name": "Blantados",
+      "role": "DD losing icons"
+    }
+  ],
+  "api_version": "0.7.5",
+  "mod_version": "1.0.0",
+  "license": "Apache-2.0"
+}

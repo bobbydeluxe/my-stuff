@@ -1,0 +1,36 @@
+import funkin.modding.module.Module;
+import funkin.ui.charSelect.CharSelectSubState;
+import funkin.graphics.shaders.AdjustColorShader;
+import openfl.filters.ShaderFilter;
+import flixel.FlxG;
+import funkin.modding.module.ModuleHandler;
+
+class CharSelectRefresh extends Module
+{
+    // by refresh i mean just putting a fucking hueshift over it lmao
+    var colorFilter:ShaderFilter;
+
+    function new()
+    {
+        super('charselect-shifted', 1,
+        {
+            state: CharSelectSubState
+        });
+    }
+
+    override function onSubStateOpenEnd(event:SubStateScriptEvent):Void {
+        super.onSubStateOpenEnd(event);
+        
+        var colorShader = new AdjustColorShader();
+        colorShader.hue = -17;
+        colorShader.saturation = 2;
+        colorShader.contrast = 5;
+        colorFilter = new ShaderFilter(colorShader);
+
+        var camera:FlxCamera = FlxG.camera;
+
+        var currentFilters:Array<ShaderFilter> = camera.filters != null ? camera.filters : [];
+        currentFilters.push(colorFilter);
+        camera.filters = currentFilters;
+    }
+}
