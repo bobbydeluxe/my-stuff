@@ -2,14 +2,14 @@
 
 // edited and improved version of the adjustColor shader from Friday Night Funkin'
 
-uniform float hue;        // in degrees
-uniform float saturation; // -100..100 (like OG)
-uniform float brightness; // -255..255
-uniform float contrast;   // -100..(>0 boosted)
-uniform float style;      // 0 -> classic HSV, 0.5 -> FNF v0.5 axis, 1.0 -> FNF v0.6 luminance-preserving
+uniform float hue;
+uniform float saturation;
+uniform float brightness;
+uniform float contrast;
 
 // incase you want more control over hueshifting style
 
+uniform float hue_mix_algorithm;     // 0 -> classic HSV, 0.5 -> FNF v0.5 axis, 1.0 -> FNF v0.6 luminance-preserving
 uniform float hue_mix_sigma;         // gaussian width around legacy axis (default ~0.18)
 uniform float hue_mix_dip_strength;  // dip strength near legacy peak (default ~0.25)
 
@@ -115,9 +115,9 @@ vec3 applyContrast(vec3 aColor, float value){
 // ---------- hue mixer ----------
 // this blends three rotation methods, with a boost around the legacy axis method
 vec3 mixHueRotations(vec3 color, float hueDeg, float styleVal) {
-    vec3 hsvRot       = applyHueRotateHSV(color, hueDeg);            // style ~ 0.0
-    vec3 legacyAxis   = applyHueAxis(color, hueDeg);                 // style ~ 0.5
-    vec3 luminanceRot = luminancePreserveHueShift(color, hueDeg);    // style ~ 1.0
+    vec3 hsvRot       = applyHueRotateHSV(color, hueDeg);            // algorithm ~ 0.0
+    vec3 legacyAxis   = applyHueAxis(color, hueDeg);                 // algorithm ~ 0.5
+    vec3 luminanceRot = luminancePreserveHueShift(color, hueDeg);    // algorithm ~ 1.0
 
     float t = clamp(styleVal, 0.0, 1.0);
 
@@ -148,7 +148,7 @@ vec3 mixHueRotations(vec3 color, float hueDeg, float styleVal) {
 vec3 applyHSBCEffect(vec3 color) {
 
     color = color + (brightness / 255.0);
-    vec3 hueMixed = mixHueRotations(color, hue, style);
+    vec3 hueMixed = mixHueRotations(color, hue, hue_mix_algorithm);
     hueMixed = applyContrast(hueMixed, contrast);
     hueMixed = applySaturation(hueMixed, saturation);
 
