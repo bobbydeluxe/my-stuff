@@ -6,7 +6,6 @@ uniform float brightness;
 uniform float contrast;
 
 uniform float algorithm;     // 0 = HSV, 0.5 = FNF 0.5+ axis, 1 = FNF 0.6+
-uniform float legacyBoost;  // axis bias
 
 const vec3 grayVals = vec3(.3098,.6078,.08235);
 
@@ -59,10 +58,8 @@ vec3 con(vec3 c,float x){
 // --- Hue Mixer ---
 vec3 mixHue(vec3 c,float d){
     float t=clamp(algorithm,0.,1.);
-    float boost=(abs(legacyBoost)<1e-6)?1.:legacyBoost; // default = 1
 
-    float g=exp(-pow(t-.5,2.)/(2.*.18*.18));
-    float dip=g*boost;
+    float dip=exp(-pow(t-.5,2.)/(2.*.18*.18));
 
     float w0=(1.-t)*(1.-dip);
     float w1=t*(1.-dip);
