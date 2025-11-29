@@ -5,7 +5,7 @@
 // This shader aims to mostly recreate how Adobe Animate/Flash handles drop shadows, but its main use here is for rim lighting.
 
 // this shader also includes a recreation of the Animate/Flash "Adjust Color" filter,
-// which was kindly provided and written by Rozebud https://github.com/ThatRozebudDude ( thank u rozebud :) )
+// which was kindly provided and written by Rozebud https://github.com/ThatRozebudDude ( thank u rozebud :D )
 // Adapted from Andrey-Postelzhuks shader found here: https://forum.unity.com/threads/hue-saturation-brightness-contrast-shader.260649/
 // Hue rotation stuff is from here: https://www.w3.org/TR/filter-effects/#feColorMatrixElement
 
@@ -31,6 +31,9 @@ uniform float saturation;
 uniform float brightness;
 uniform float contrast;
 
+// bobby's lil hsv mode mixer thing
+uniform float hsvMode;
+
 uniform float AA_STAGES;
 
 // new variables added by (nex_isdumb from codename engine)!
@@ -45,12 +48,97 @@ const float e = 2.718281828459045;
 vec3 applyHueRotate(vec3 aColor, float aHue){
   float angle = radians(aHue);
 
-  mat3 m1 = mat3(0.213, 0.213, 0.213, 0.715, 0.715, 0.715, 0.072, 0.072, 0.072);
-  mat3 m2 = mat3(0.787, -0.213, -0.213, -0.715, 0.285, -0.715, -0.072, -0.072, 0.928);
-  mat3 m3 = mat3(-0.213, 0.143, -0.787, -0.715, 0.140, 0.715, 0.928, -0.283, 0.072);
+  mat3 m1 = mat3(0.213, 0.213, 0.213,
+                 0.715, 0.715, 0.715,
+                 0.072, 0.072, 0.072);
+  mat3 m2 = mat3(0.787, -0.213, -0.213,
+                -0.715,  0.285, -0.715,
+                -0.072, -0.072,  0.928);
+  mat3 m3 = mat3(-0.213,  0.143, -0.787,
+                -0.715,  0.140,  0.715,
+                 0.928, -0.283,  0.072);
   mat3 m = m1 + cos(angle) * m2 + sin(angle) * m3;
 
   return m * aColor;
+}
+
+// ===== new hue mix shit =====
+
+// --- HSV ---
+vec3 rgb2hsv(vec3 c){
+  float M = max(max(c.r, c.g), c.b);
+  float m = min(min(c.r, c.g), c.b);
+  float d = M - m;
+
+  float h = (d < 1e-6) ? 0.0 : (
+    M == c.r ? mod((c.g - c.b) / d, 6.0) :
+    M == c.g ? (c.b - c.r) / d + 2.0 :
+               (c.r - c.g) / d + 4.0
+  );
+
+  if(h < 0.0) h += 6.0;
+  h *= 60.0;
+
+  float s = (M <= 0.0) ? 0.0 : d / M;
+  return vec3(h, s, M);
+}
+
+vec3 hsv2rgb(vec3 h){
+  float C = h.z * h.y;
+  float X = C * (1.0 - abs(mod(h.x / 60.0, 2.0) - 1.0));
+  float m = h.z - C;
+
+  vec3 r =
+    (h.x <  60.0) ? vec3(C, X, 0.0) :
+    (h.x < 120.0) ? vec3(X, C, 0.0) :
+    (h.x < 180.0) ? vec3(0.0, C, X) :
+    (h.x < 240.0) ? vec3(0.0, X, C) :
+    (h.x < 300.0) ? vec3(X, 0.0, C) :
+                    vec3(C, 0.0, X);
+
+  return r + vec3(m);
+}
+
+vec3 hueHSV(vec3 c, float d){
+  vec3 h = rgb2hsv(c);
+  h.x = mod(h.x + d, 360.0);
+  return hsv2rgb(h);
+}
+
+// --- Axis ---
+vec3 hueAxis(vec3 c, float d){
+  float a  = radians(d);
+  float cs = cos(a);
+  float sn = sin(a);
+  vec3 k   = normalize(vec3(1.0)); // axis along (1,1,1)
+
+  return c * cs + cross(k, c) * sn + k * dot(k, c) * (1.0 - cs);
+}
+
+// --- Luminance (Flash-style) ---
+vec3 hueLum(vec3 c, float d){
+  // reuse the original luminance-based matrix rotation
+  return applyHueRotate(c, d);
+}
+
+// --- Hue Mixer ---
+vec3 mixHue(vec3 c, float d){
+  float t = clamp(hsvMode, 0.0, 1.0);
+
+  // bell-shaped "dip" centered at 0.5, std dev ~0.18
+  float dip = exp(-pow(t - 0.5, 2.0) / (2.0 * 0.18 * 0.18));
+
+  // weights: HSV (w0), luminance (w1), axis (wA)
+  float w1 = (1.0 - t) * (1.0 - dip); // HSV
+  float w0 = t * (1.0 - dip);         // Lum/FNF
+  float wA = dip;                     // Axis strongest around 0.5
+
+  float s = w0 + w1 + wA + 1e-6;
+  w0 /= s; w1 /= s; wA /= s;
+
+  return hueHSV(c, d) * w0 +
+         hueAxis(c, d) * wA +
+         hueLum(c, d) * w1;
 }
 
 vec3 applySaturation(vec3 aColor, float value){
@@ -71,20 +159,22 @@ vec3 applyContrast(vec3 aColor, float value){
 
 vec3 applyHSBCEffect(vec3 color){
 
-  //Brightness
-  color = color + ((brightness) / 255.0);
+  // Brightness
+  color = color + (brightness / 255.0);
 
-  //Hue
-  color = applyHueRotate(color, hue);
+  // Hue
+  color = mixHue(color, hue);
 
-  //Contrast
+  // Contrast
   color = applyContrast(color, contrast);
 
-  //Saturation
+  // Saturation
   color = applySaturation(color, saturation);
 
   return color;
 }
+
+// ===== rest of original dropshadow shader =====
 
 vec2 hash22(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
@@ -128,7 +218,7 @@ float antialias(vec2 fragCoord, float curThreshold, bool useMask) {
   for (int i = 0; i < MAX_AA * MAX_AA; i++) {
     // Calculate x and y from i
     int x = i / MAX_AA;
-    int y = i - (MAX_AA * int(i/MAX_AA)); // poor mans modulus
+    int y = i - (MAX_AA * int(i / MAX_AA)); // poor mans modulus
 
     // Skip iterations beyond our desired AA_STAGES
     if (float(x) >= AA_STAGES || float(y) >= AA_STAGES) {
@@ -148,7 +238,7 @@ vec3 createDropShadow(vec3 col, float curThreshold, bool useMask) {
   float intensity = antialias(openfl_TextureCoordv, curThreshold, useMask);
 
   // the distance the dropshadow moves needs to be correctly scaled based on the texture size
-  vec2 imageRatio = vec2(1.0/openfl_TextureSize.x, 1.0/openfl_TextureSize.y);
+  vec2 imageRatio = vec2(1.0 / openfl_TextureSize.x, 1.0 / openfl_TextureSize.y);
 
   // check the pixel in the direction and distance specified
   vec2 offset = vec2(
@@ -174,7 +264,7 @@ vec3 createDropShadow(vec3 col, float curThreshold, bool useMask) {
   }
 
   // add the dropshadow color  based on the amount, strength, and intensity
-  col.rgb += dropColor.rgb * ((1.0 - (dropShadowAmount * str))*intensity);
+  col.rgb += dropColor.rgb * ((1.0 - (dropShadowAmount * str)) * intensity);
 
   return col;
 }

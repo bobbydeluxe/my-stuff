@@ -5,7 +5,8 @@ uniform float saturation;
 uniform float brightness;
 uniform float contrast;
 
-uniform float algorithm;     // 0 = HSV, 0.5 = FNF 0.5+ axis, 1 = FNF 0.6+
+// new thing added by me (bobbyDX)
+uniform float hsvMode;     // 0 = FNF 0.6+ , 0.5 = FNF 0.5+ axis, 1 = HSV
 
 const vec3 grayVals = vec3(.3098,.6078,.08235);
 
@@ -57,13 +58,13 @@ vec3 con(vec3 c,float x){
 
 // --- Hue Mixer ---
 vec3 mixHue(vec3 c,float d){
-    float t=clamp(algorithm,0.,1.);
+    float t=clamp(hsvMode,0.,1.);
 
     float dip=exp(-pow(t-.5,2.)/(2.*.18*.18));
 
-    float w0=(1.-t)*(1.-dip);
-    float w1=t*(1.-dip);
-    float wA=g;
+    float w1=(1.-t)*(1.-dip);
+    float w0=t*(1.-dip);
+    float wA=dip;
 
     float s=w0+w1+wA+1e-6;
     w0/=s; w1/=s; wA/=s;
