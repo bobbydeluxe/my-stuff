@@ -4,15 +4,27 @@
 
 float NoiseSeed;
 uniform vec3 flareTint;
-uniform float flareMix;
+// flareParams: x = mix, y = threshold, z = intensity, w = stretch
+uniform vec4 flareParams;
+uniform float flareBrightness;
+// other customization
+uniform float chromaAmount;
+uniform float grainAmount;
+uniform float glowStrength;
+uniform float glowBase;
+uniform float contrastAmount;
+uniform float marginSize;
+// contrast curve modifiers as vec3: x=Red, y=Green, z=Blue
+uniform vec3 contrastCurve;
+// contrast correction factors as vec3: x=Red, y=Green, z=Blue
+uniform vec3 contrastCorrection;
+uniform float toneMapMix;
 float randomFloat(){
 	NoiseSeed = sin(NoiseSeed) * 84522.13219145687;
 	return fract(NoiseSeed);
 }
 
 uniform vec3 gradeColor;
-// defaults to [1,1,1] when unset
-// for og shader color grading use .80379747
 
 float SCurve (float value, float amount, float correction) {
 	float curve = 1.0;
@@ -64,11 +76,11 @@ vec3 filmGrain() {
 }
 
 //Sigmoid Contrast from: https://www.shadertoy.com/view/MlXGRf
-vec3 contrast(vec3 color)
+vec3 contrast(vec3 color, float rAmount, float gAmount, float bAmount, float rCorrection, float gCorrection, float bCorrection)
 {
-	return vec3(SCurve(color.r, 3.0, 1.0), 
-				SCurve(color.g, 4.0, 0.7), 
-				SCurve(color.b, 2.6, 0.6)
+	return vec3(SCurve(color.r, rAmount, rCorrection), 
+				SCurve(color.g, gAmount, gCorrection), 
+				SCurve(color.b, bAmount, bCorrection)
 			   );
 }
 
@@ -100,7 +112,6 @@ vec3 flares(sampler2D tex, vec2 uv, float threshold, float intensity, float stre
 	}
 	
 	hdr *= vec3(1.0,1.0,1.0); //tint
-	// Apply customizable tint (fall back to base tint if uniform is not set)
 	vec3 baseTint = vec3(1.0,1.0,1.0);
 	vec3 effectiveTint = baseTint * flareTint;
 	if (all(equal(flareTint, vec3(0.0)))) {
@@ -194,44 +205,88 @@ void main() {
 	vec3 color = flixel_texture2D(bitmap, uv).xyz;
 	
 	
-	//chromatic abberation
-	color = chromaticAbberation(bitmap, uv, 0.3);
-	
-	
-	//film grain
-	color *= filmGrain();
-	
-	
-	//ACES Tonemapping
-	color = ACESFilm(color)
-  
-	vec3 effectiveGrade = gradeColor;
-	if (all(equal(gradeColor, vec3(0.0)))) {
-		effectiveGrade = vec3(1.0);
-	}
-  
-	// produces a neutral image. Then apply the requested grade tint on top.
-	vec3 neutralTone = ACESFilm(vec3(1.0));
-	vec3 safeNeutral = max(neutralTone, vec3(1e-6));
-	vec3 gradeOffset = effectiveGrade / safeNeutral;
-	color *= gradeOffset;
-	
-	
-	//glow
-	color = clamp(.1 + glow(color, uv) * .9, .0, 1.);
-	
-	
-	//contrast
-	color = contrast(color) * 0.9;
-	
-	
-	//flare
-	vec3 flareContribution = flares(bitmap, uv, 0.9, 200.0, .04, 0.1);
-	color += flareContribution * flareMix;
-	
-	
-	//margins
-	color = margins(color, uv, 0.1);
+		// chromatic aberration (default 0.0 = disabled)
+		float safeChroma = chromaAmount;
+		if (safeChroma < 0.0) safeChroma = 0.0;
+		if (safeChroma > 0.0) color = chromaticAbberation(bitmap, uv, safeChroma);
+
+		// film grain (default 0.0 = no grain)
+		float safeGrain = grainAmount;
+		if (safeGrain < 0.0) safeGrain = 0.0;
+		if (safeGrain > 0.0) {
+			vec3 grainSample = filmGrain();
+			color *= mix(vec3(1.0), grainSample, safeGrain);
+		}
+
+		// ACES Tonemapping with controllable mix (default 0.0 = no tonemap)
+		float safeToneMix = toneMapMix;
+		if (safeToneMix < 0.0) safeToneMix = 0.0;
+		if (safeToneMix > 0.0) {
+			vec3 preTone = color;
+			vec3 aces = ACESFilm(preTone);
+			color = mix(preTone, aces, safeToneMix);
+		}
+
+		// Apply color grading tint (default [1,1,1] = no grade)
+		vec3 effectiveGrade = gradeColor;
+		if (all(equal(gradeColor, vec3(0.0)))) {
+			effectiveGrade = vec3(1.0);
+		}
+		if (!all(equal(effectiveGrade, vec3(1.0)))) {
+			vec3 neutralTone = ACESFilm(vec3(1.0));
+			vec3 safeNeutral = max(neutralTone, vec3(1e-6));
+			vec3 gradeOffsetToneMap = effectiveGrade / safeNeutral;
+			vec3 gradeOffsetNoTone = effectiveGrade;
+			vec3 gradeOffset = mix(gradeOffsetNoTone, gradeOffsetToneMap, safeToneMix);
+			color *= gradeOffset;
+		}
+		
+		// glow
+		float safeGlowStrength = glowStrength;
+		if (safeGlowStrength < 0.0) safeGlowStrength = 0.0;
+		if (safeGlowStrength > 0.0) {
+			float safeGlowBase = glowBase;
+			if (safeGlowBase < 0.0) safeGlowBase = 0.0;
+			color = clamp(safeGlowBase + glow(color, uv) * safeGlowStrength, .0, 1.0);
+		}
+
+		// contrast
+		float safeContrast = contrastAmount;
+		if (safeContrast < 0.0) safeContrast = 0.0;
+		if (safeContrast > 0.0) {
+			vec3 safeCurve = contrastCurve;
+			if (all(lessThanEqual(contrastCurve, vec3(0.0)))) {
+				safeCurve = vec3(1.0, 1.0, 1.0); // default curve amounts
+			}
+			vec3 safeCorr = contrastCorrection;
+			if (all(lessThanEqual(contrastCorrection, vec3(0.0)))) {
+				safeCorr = vec3(1.0, 1.0, 1.0); // default correction factors
+			}
+			color = mix(color, contrast(color, safeCurve.x, safeCurve.y, safeCurve.z, safeCorr.x, safeCorr.y, safeCorr.z), safeContrast);
+		}
+
+		// flare: use packed vec4 `flareParams` (mix, threshold, intensity, stretch)
+		// default all zeros = no flares
+		float safeFlareMix = flareParams.x;
+		if (safeFlareMix < 0.0) safeFlareMix = 0.0;
+		if (safeFlareMix > 0.0) {
+			float safeFlareThreshold = flareParams.y;
+			if (safeFlareThreshold <= 0.0) safeFlareThreshold = 0.9;
+			float safeFlareIntensity = flareParams.z;
+			if (safeFlareIntensity <= 0.0) safeFlareIntensity = 200.0;
+			float safeFlareStretch = flareParams.w;
+			if (safeFlareStretch <= 0.0) safeFlareStretch = 0.04;
+
+			float safeFlareBrightness = flareBrightness;
+
+			vec3 flareContribution = flares(bitmap, uv, safeFlareThreshold, safeFlareIntensity, safeFlareStretch, safeFlareBrightness);
+			color += flareContribution * safeFlareMix;
+		}
+
+		// margins (default 0.0 = no margins)
+		float safeMargin = marginSize;
+		if (safeMargin < 0.0) safeMargin = 0.0;
+		if (safeMargin > 0.0) color = margins(color, uv, safeMargin);
 	
 	
 	//output
