@@ -8,10 +8,6 @@ uhh [gamebanana page](https://gamebanana.com/mods/622155)
 
 ## changes
 
-- a-bot now uses `AdjustColorShader` if nene uses a `DropShadowShader`, so a-bot doesn't bug out anymore
-
-- `nene-tankmen`'s a-bot instance takes HSBC values from nene. same goes for `otis-speaker`
-
 - `spookyMansion` stage now has `AdjustColorShader` used on characters and the background
 
 - `mallXmasErect` uses new shader parameters (credits to denoohay, it was a minimal change really)
